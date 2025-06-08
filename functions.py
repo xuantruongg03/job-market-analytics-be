@@ -55,7 +55,6 @@ def initialize_global_cache():
         """Load skill worldwide data"""
         try:
             spark = get_spark_session()
-            # df = spark.read.json("./output/task2/skill_counts.json/part-00000-1b6cdf26-973b-4869-bc16-0b1ea7099079-c000.json")
             path = os.getenv("SKILL_COUNTS")
             df = spark.read.json(path)
             result = df.select("skill", "count") \
@@ -75,7 +74,6 @@ def initialize_global_cache():
         """Load skill by country data"""
         try:
             spark = get_spark_session()
-            # df = spark.read.json("./output/task2/skill_counts_by_country.json/part-00000-695c186b-88aa-47ae-8d14-8e78e14c14eb-c000.json")
             path = os.getenv("SKILL_COUNTS_BY_COUNTRY")
             df = spark.read.json(path)
             result = df.select("skill", "count", "search_country") \
@@ -99,17 +97,13 @@ def initialize_global_cache():
         """Load các data khác"""
         try:
             # Load job counts worldwide
-            # job_counts_data = read_file_by_pyspark_safe("./output/task1/job_title_counts_grouped.json/part-00000-d1f721b6-1d56-436a-855e-9daa1c949938-c000.json")
             path = os.getenv("JOB_COUNTS")
             job_counts_data = read_file_by_pyspark_safe(path)
             _global_cache['job_counts_worldwide'] = job_counts_data if isinstance(job_counts_data, list) else []
             print("Loaded job_counts_worldwide")  
 
-
-            # job_counts_by_country_data = read_file_by_pyspark_safe("./output/task1/search_country_grouped_jobs.json/part-00000-c2545a08-2b55-4138-b549-3013074d4d66-c000.json")
             path = os.getenv("JOB_COUNTS_BY_COUNTRY")
             job_counts_by_country_data = read_file_by_pyspark_safe(path)
-            # Xử lý dữ liệu job_counts_by_country để chuyển đổi Row objects
             processed_country_data = []
             if isinstance(job_counts_by_country_data, list):
                 for country_item in job_counts_by_country_data:
@@ -138,7 +132,6 @@ def initialize_global_cache():
             print(f"Loaded and processed {len(processed_country_data)} job_counts_by_country records")
 
             # Load job counts by month
-            # job_counts_by_month_data = read_file_by_pyspark_safe("./output/task4/job_counts_by_month_sorted.json/part-00000-35b9d95e-3133-482f-9c52-c4b8473a5a6c-c000.json")
             path = os.getenv("JOB_COUNTS_BY_MONTH")
             job_counts_by_month_data = read_file_by_pyspark_safe(path)
             # Xử lý và chuyển đổi format dữ liệu job_counts_by_month
@@ -176,7 +169,6 @@ def initialize_global_cache():
             print(f"Loaded and processed {len(processed_month_data)} job_counts_by_month records")
 
             # Load vietnamese skills
-            # vietnamese_skills_data = read_file_by_pyspark_safe("./output/task2/vietnames_skills.json/part-00007-6cac5dde-ebf3-4e26-b1e7-2d2d50e2d3bb-c000.json")
             path = os.getenv("VIETNAMESE_SKILLS")
             vietnamese_skills_data = read_file_by_pyspark_safe(path)
             _global_cache['vietnamese_skills'] = vietnamese_skills_data if isinstance(vietnamese_skills_data, list) else []
@@ -203,12 +195,9 @@ def initialize_global_cache():
             spark = get_spark_session()
             df = spark.read.option("header", "true") \
                 .option("inferSchema", "false") \
-                .csv("combined_csv_final.csv")
-            print("df ", df)
-            # Lưu DataFrame vào cache thay vì list
+                .csv(os.getenv("RAW_JOB_DATA"))
             selected_df = df
             
-            # Cache DataFrame để sử dụng lại
             selected_df.cache()
             _global_cache['raw_job_data'] = selected_df
         except Exception as e:
@@ -261,32 +250,44 @@ def get_spark_session():
     """
     global _spark_session
     with _spark_lock:
-        # Kiểm tra nếu session đã bị dừng hoặc không tồn tại
         if _spark_session is None or _spark_session.sparkContext._jsc is None:
             try:
-                # Dừng session cũ nếu còn tồn tại
                 if _spark_session is not None:
                     _spark_session.stop()
             except:
                 pass
             
             # Tạo session mới
+            # _spark_session = SparkSession.builder \
+            #     .appName("JobSkillsAnalysis") \
+            #     .master("local[2]") \
+            #     .config("spark.sql.adaptive.enabled", "true") \
+            #     .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+            #     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+            #     .config("spark.pyspark.python", sys.executable) \
+            #     .config("spark.pyspark.driver.python", sys.executable) \
+            #     .config("spark.driver.memory", "2g") \
+            #     .config("spark.driver.maxResultSize", "1g") \
+            #     .config("spark.executor.memory", "2g") \
+            #     .config("spark.sql.execution.arrow.pyspark.enabled", "false") \
+            #     .config("spark.hadoop.io.native.lib.available", "false") \
+            #     .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB") \
+            #     .getOrCreate()
+            # _spark_session.sparkContext.setLogLevel("ERROR")
             _spark_session = SparkSession.builder \
-                .appName("JobSkillsAnalysis") \
-                .master("local[2]") \
-                .config("spark.sql.adaptive.enabled", "true") \
-                .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-                .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-                .config("spark.pyspark.python", sys.executable) \
-                .config("spark.pyspark.driver.python", sys.executable) \
+                .appName("Read B2 via S3") \
+                .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.1") \
+                .config("spark.hadoop.fs.s3a.endpoint", "s3.us-east-005.backblazeb2.com") \
+                .config("spark.hadoop.fs.s3a.access.key", os.getenv("ACCESS_KEY_ID")) \
+                .config("spark.hadoop.fs.s3a.secret.key", os.getenv("SECRET_ACCESS_KEY")) \
+                .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "true") \
+                .config("spark.hadoop.fs.s3a.path.style.access", "true") \
+                .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
                 .config("spark.driver.memory", "2g") \
-                .config("spark.driver.maxResultSize", "1g") \
                 .config("spark.executor.memory", "2g") \
-                .config("spark.sql.execution.arrow.pyspark.enabled", "false") \
-                .config("spark.hadoop.io.native.lib.available", "false") \
-                .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB") \
+                .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
                 .getOrCreate()
-            _spark_session.sparkContext.setLogLevel("ERROR")
+
     return _spark_session
 
 def reset_spark_session():
