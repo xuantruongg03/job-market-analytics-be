@@ -12,6 +12,10 @@ import sys
 import threading
 import time
 from format_job import normalize_title
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Thiết lập Python path cho PySpark
 os.environ['PYSPARK_PYTHON'] = sys.executable
@@ -51,7 +55,9 @@ def initialize_global_cache():
         """Load skill worldwide data"""
         try:
             spark = get_spark_session()
-            df = spark.read.json("./output/task2/skill_counts.json/part-00000-1b6cdf26-973b-4869-bc16-0b1ea7099079-c000.json")
+            # df = spark.read.json("./output/task2/skill_counts.json/part-00000-1b6cdf26-973b-4869-bc16-0b1ea7099079-c000.json")
+            path = os.getenv("SKILL_COUNTS")
+            df = spark.read.json(path)
             result = df.select("skill", "count") \
                 .orderBy(col("count").desc()) \
                 .collect()
@@ -69,7 +75,9 @@ def initialize_global_cache():
         """Load skill by country data"""
         try:
             spark = get_spark_session()
-            df = spark.read.json("./output/task2/skill_counts_by_country.json/part-00000-695c186b-88aa-47ae-8d14-8e78e14c14eb-c000.json")
+            # df = spark.read.json("./output/task2/skill_counts_by_country.json/part-00000-695c186b-88aa-47ae-8d14-8e78e14c14eb-c000.json")
+            path = os.getenv("SKILL_COUNTS_BY_COUNTRY")
+            df = spark.read.json(path)
             result = df.select("skill", "count", "search_country") \
                 .orderBy(col("count").desc()) \
                 .collect()
@@ -91,11 +99,16 @@ def initialize_global_cache():
         """Load các data khác"""
         try:
             # Load job counts worldwide
-            job_counts_data = read_file_by_pyspark_safe("./output/task1/job_title_counts_grouped.json/part-00000-d1f721b6-1d56-436a-855e-9daa1c949938-c000.json")
+            # job_counts_data = read_file_by_pyspark_safe("./output/task1/job_title_counts_grouped.json/part-00000-d1f721b6-1d56-436a-855e-9daa1c949938-c000.json")
+            path = os.getenv("JOB_COUNTS")
+            job_counts_data = read_file_by_pyspark_safe(path)
             _global_cache['job_counts_worldwide'] = job_counts_data if isinstance(job_counts_data, list) else []
-            print("Loaded job_counts_worldwide")            
-            job_counts_by_country_data = read_file_by_pyspark_safe("./output/task1/search_country_grouped_jobs.json/part-00000-c2545a08-2b55-4138-b549-3013074d4d66-c000.json")
-            
+            print("Loaded job_counts_worldwide")  
+
+
+            # job_counts_by_country_data = read_file_by_pyspark_safe("./output/task1/search_country_grouped_jobs.json/part-00000-c2545a08-2b55-4138-b549-3013074d4d66-c000.json")
+            path = os.getenv("JOB_COUNTS_BY_COUNTRY")
+            job_counts_by_country_data = read_file_by_pyspark_safe(path)
             # Xử lý dữ liệu job_counts_by_country để chuyển đổi Row objects
             processed_country_data = []
             if isinstance(job_counts_by_country_data, list):
@@ -125,8 +138,9 @@ def initialize_global_cache():
             print(f"Loaded and processed {len(processed_country_data)} job_counts_by_country records")
 
             # Load job counts by month
-            job_counts_by_month_data = read_file_by_pyspark_safe("./output/task4/job_counts_by_month_sorted.json/part-00000-35b9d95e-3133-482f-9c52-c4b8473a5a6c-c000.json")
-            
+            # job_counts_by_month_data = read_file_by_pyspark_safe("./output/task4/job_counts_by_month_sorted.json/part-00000-35b9d95e-3133-482f-9c52-c4b8473a5a6c-c000.json")
+            path = os.getenv("JOB_COUNTS_BY_MONTH")
+            job_counts_by_month_data = read_file_by_pyspark_safe(path)
             # Xử lý và chuyển đổi format dữ liệu job_counts_by_month
             processed_month_data = []
             if isinstance(job_counts_by_month_data, list):
@@ -162,7 +176,9 @@ def initialize_global_cache():
             print(f"Loaded and processed {len(processed_month_data)} job_counts_by_month records")
 
             # Load vietnamese skills
-            vietnamese_skills_data = read_file_by_pyspark_safe("./output/task2/vietnames_skills.json/part-00007-6cac5dde-ebf3-4e26-b1e7-2d2d50e2d3bb-c000.json")
+            # vietnamese_skills_data = read_file_by_pyspark_safe("./output/task2/vietnames_skills.json/part-00007-6cac5dde-ebf3-4e26-b1e7-2d2d50e2d3bb-c000.json")
+            path = os.getenv("VIETNAMESE_SKILLS")
+            vietnamese_skills_data = read_file_by_pyspark_safe(path)
             _global_cache['vietnamese_skills'] = vietnamese_skills_data if isinstance(vietnamese_skills_data, list) else []
             print("Loaded vietnamese_skills")
 
@@ -287,11 +303,10 @@ def reset_spark_session():
 
 def analyze_job_skills(job_title, country, limit=15):
     try:
-        # wait_for_cache()
+        wait_for_cache()
         limit = int(limit)
         raw_data_df = _global_cache['raw_job_data']
-        # Xủ lý title job 
-        job_title = normalize_title(job_title)
+        job_title = normalize_title(job_title) == "Unknown" and job_title or normalize_title(job_title)
         if raw_data_df is None:
             return {
                 "status": "error",
