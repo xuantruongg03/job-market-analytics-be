@@ -10,7 +10,6 @@ from functions import (
 app = Flask(__name__)
 CORS(app)
 
-# Global Spark session và lock để thread-safe
 spark_session = None
 spark_lock = Lock()
 
@@ -280,12 +279,11 @@ if __name__ == "__main__":
         
         with JobAnalyzer() as analyzer:
             analyzer.initialize_global_cache()
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        app.run(debug=False, host='0.0.0.0', port=5000)
         
     except KeyboardInterrupt:
         print("\nServer đã dừng")
     finally:
-        # Cleanup Spark session
         if spark_session:
             spark_session.stop()
             print("Đã đóng Spark session")

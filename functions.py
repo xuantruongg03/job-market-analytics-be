@@ -14,14 +14,12 @@ import time
 from format_job import normalize_title
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
 # Thiết lập Python path cho PySpark
 os.environ['PYSPARK_PYTHON'] = sys.executable
 os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
-# Global variables for singleton pattern
 _spark_session = None
 _spark_lock = Lock()
 
@@ -36,7 +34,6 @@ _global_cache = {
     'raw_job_data': None,
     'processed_skills_data': None
 }
-_cache_lock = threading.Lock()
 _cache_initialized = False
 _cache_loading = False
 
@@ -96,7 +93,6 @@ def initialize_global_cache():
     def load_other_data():
         """Load các data khác"""
         try:
-            # Load job counts worldwide
             path = os.getenv("JOB_COUNTS")
             job_counts_data = read_file_by_pyspark_safe(path)
             _global_cache['job_counts_worldwide'] = job_counts_data if isinstance(job_counts_data, list) else []
@@ -131,10 +127,8 @@ def initialize_global_cache():
             _global_cache['job_counts_by_country'] = processed_country_data
             print(f"Loaded and processed {len(processed_country_data)} job_counts_by_country records")
 
-            # Load job counts by month
             path = os.getenv("JOB_COUNTS_BY_MONTH")
             job_counts_by_month_data = read_file_by_pyspark_safe(path)
-            # Xử lý và chuyển đổi format dữ liệu job_counts_by_month
             processed_month_data = []
             if isinstance(job_counts_by_month_data, list):
                 for item in job_counts_by_month_data:
@@ -168,13 +162,11 @@ def initialize_global_cache():
             _global_cache['job_counts_by_month'] = processed_month_data
             print(f"Loaded and processed {len(processed_month_data)} job_counts_by_month records")
 
-            # Load vietnamese skills
             path = os.getenv("VIETNAMESE_SKILLS")
             vietnamese_skills_data = read_file_by_pyspark_safe(path)
             _global_cache['vietnamese_skills'] = vietnamese_skills_data if isinstance(vietnamese_skills_data, list) else []
             print("Loaded vietnamese_skills")
 
-            # Extract countries list
             countries = set()
             for item in _global_cache['job_counts_by_country']:
                 if isinstance(item, dict) and 'search_country' in item and item['search_country']:
@@ -223,15 +215,9 @@ def read_file_by_pyspark_safe(file_path):
     try:
         spark = get_spark_session()
         df = spark.read.json(file_path)
-        # Convert to list of dicts
         return [row.asDict() for row in df.collect()]
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
-        # Fallback: đọc file trực tiếp
-        try:
-            return read_file(file_path)
-        except:
-            return []
 
 def wait_for_cache():
     """Đợi cache load xong"""
@@ -258,35 +244,35 @@ def get_spark_session():
                 pass
             
             # Tạo session mới
-            # _spark_session = SparkSession.builder \
-            #     .appName("JobSkillsAnalysis") \
-            #     .master("local[2]") \
-            #     .config("spark.sql.adaptive.enabled", "true") \
-            #     .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-            #     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-            #     .config("spark.pyspark.python", sys.executable) \
-            #     .config("spark.pyspark.driver.python", sys.executable) \
-            #     .config("spark.driver.memory", "2g") \
-            #     .config("spark.driver.maxResultSize", "1g") \
-            #     .config("spark.executor.memory", "2g") \
-            #     .config("spark.sql.execution.arrow.pyspark.enabled", "false") \
-            #     .config("spark.hadoop.io.native.lib.available", "false") \
-            #     .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB") \
-            #     .getOrCreate()
-            # _spark_session.sparkContext.setLogLevel("ERROR")
             _spark_session = SparkSession.builder \
-                .appName("Read B2 via S3") \
-                .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.1") \
-                .config("spark.hadoop.fs.s3a.endpoint", "s3.us-east-005.backblazeb2.com") \
-                .config("spark.hadoop.fs.s3a.access.key", os.getenv("ACCESS_KEY_ID")) \
-                .config("spark.hadoop.fs.s3a.secret.key", os.getenv("SECRET_ACCESS_KEY")) \
-                .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "true") \
-                .config("spark.hadoop.fs.s3a.path.style.access", "true") \
-                .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-                .config("spark.driver.memory", "2g") \
-                .config("spark.executor.memory", "2g") \
+                .appName("JobSkillsAnalysis") \
+                .master("local[2]") \
+                .config("spark.sql.adaptive.enabled", "true") \
+                .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
                 .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+                .config("spark.pyspark.python", sys.executable) \
+                .config("spark.pyspark.driver.python", sys.executable) \
+                .config("spark.driver.memory", "2g") \
+                .config("spark.driver.maxResultSize", "1g") \
+                .config("spark.executor.memory", "2g") \
+                .config("spark.sql.execution.arrow.pyspark.enabled", "false") \
+                .config("spark.hadoop.io.native.lib.available", "false") \
+                .config("spark.sql.adaptive.advisoryPartitionSizeInBytes", "64MB") \
                 .getOrCreate()
+            _spark_session.sparkContext.setLogLevel("ERROR")
+            # _spark_session = SparkSession.builder \
+            #     .appName("Read B2 via S3") \
+            #     .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.1") \
+            #     .config("spark.hadoop.fs.s3a.endpoint", "s3.us-east-005.backblazeb2.com") \
+            #     .config("spark.hadoop.fs.s3a.access.key", os.getenv("ACCESS_KEY_ID")) \
+            #     .config("spark.hadoop.fs.s3a.secret.key", os.getenv("SECRET_ACCESS_KEY")) \
+            #     .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "true") \
+            #     .config("spark.hadoop.fs.s3a.path.style.access", "true") \
+            #     .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+            #     .config("spark.driver.memory", "2g") \
+            #     .config("spark.executor.memory", "2g") \
+            #     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+            #     .getOrCreate()
 
     return _spark_session
 
@@ -315,7 +301,6 @@ def analyze_job_skills(job_title, country, limit=15):
                 "job_title": job_title,
                 "country": country
             }
-          # Lọc theo job_title và country sử dụng DataFrame
         filtered_jobs_df = raw_data_df.filter(
             (lower(col("job_title")).contains(job_title.lower())) &
             (lower(col("search_country")).contains(country.lower()))
@@ -471,16 +456,6 @@ def stop_spark_session():
             _spark_session.stop()
             _spark_session = None
 
-def read_file(file_path):
-    import json
-    results = []
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            item = json.loads(line)
-            results.append(item)
-
-    return results
-
 def get_countries():
     """Lấy danh sách các quốc gia từ file"""
     wait_for_cache() 
@@ -512,7 +487,6 @@ def analyze_skill_by_country(country=None, limit=None):
     """Phân tích kỹ năng theo quốc gia"""
     wait_for_cache()
     skill_counts = []
-    # Sắp xếp theo count giảm dần và lấy limit trước khi collect
     if limit:
         try:
             limit = int(limit)
@@ -538,25 +512,20 @@ def get_job_by_country(country=None, limit=None, page=1):
     for item in _global_cache['job_counts_by_country']:
         if item['search_country'].lower() == country.lower():
             jobs_data = item['data']
-            
-            # Chuyển đổi Row objects thành dictionaries
             processed_jobs = []
             for job in jobs_data:
                 if hasattr(job, 'asDict'):
-                    # Nếu là Row object từ PySpark
                     job_dict = job.asDict()
                     processed_jobs.append({
                         "job_title": job_dict.get('job_title', ''),
                         "count": job_dict.get('count', 0)
                     })
                 elif isinstance(job, dict):
-                    # Nếu đã là dictionary
                     processed_jobs.append({
                         "job_title": job.get('job_title', ''),
                         "count": job.get('count', 0)
                     })
                 elif isinstance(job, (list, tuple)) and len(job) >= 2:
-                    # Nếu là array/tuple [count, job_title]
                     processed_jobs.append({
                         "job_title": str(job[1]) if len(job) > 1 else '',
                         "count": int(job[0]) if len(job) > 0 else 0
@@ -574,7 +543,7 @@ def get_job_by_country(country=None, limit=None, page=1):
                     end_index = start_index + limit
                     processed_jobs = processed_jobs[start_index:end_index]
                 except (ValueError, TypeError):
-                    processed_jobs = processed_jobs[:10]  # Default limit
+                    processed_jobs = processed_jobs[:10] 
             
             return [{
                 "search_country": item['search_country'],
@@ -603,14 +572,12 @@ def read_file_skill_counts_worldwide(limit=None):
     """Lấy thống kê kỹ năng toàn cầu"""
     wait_for_cache()
     skill_count_worldwide = _global_cache['skill_counts_worldwide']
-
-    # Dữ liệu đã được sắp xếp trong cache, chỉ cần áp dụng limit
     if limit:
         try:
             limit = int(limit)
             skill_count_worldwide = skill_count_worldwide[:limit]
         except (ValueError, TypeError):
-            skill_count_worldwide = skill_count_worldwide[:10]  # Default top 10
+            skill_count_worldwide = skill_count_worldwide[:10]
     
     return skill_count_worldwide
 
@@ -622,8 +589,6 @@ class JobAnalyzer:
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Don't stop Spark session for web applications
-        # The session should remain alive for cached DataFrames
         pass
     
     def analyze_skills(self, job_title, country, limit):

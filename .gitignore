@@ -3,3 +3,6 @@
 /output
 .env
 test.py
+Dockerfile
+fly.toml
+.github/

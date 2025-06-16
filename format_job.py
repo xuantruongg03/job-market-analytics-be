@@ -399,8 +399,6 @@ professions_vietnamese = [
   {"name": "Electronics and Telecommunications Installation and Repair Worker", "keywords": ["Thợ điện tử viễn thông", "Lắp đặt", "Sửa chữa", "Điện tử", "Viễn thông"]},  {"name": "Assembler", "keywords": ["Thợ lắp ráp", "Lắp ráp", "Sản xuất", "Nhà máy", "Linh kiện", "Công nhân"]}
 ]
 
-# ===== MẢNG MERGED DUY NHẤT - CÁCH TIẾP CẬN TỐI ÂU =====
-# Gộp 2 mảng thành 1 mảng duy nhất để cải thiện hiệu suất
 def _create_merged_professions():
     """
     Tạo mảng merged một lần duy nhất khi module được import
@@ -414,7 +412,6 @@ def _create_merged_professions():
         profession_name = english_prof["name"]
         vietnamese_keywords = vietnamese_dict.get(profession_name, [])
         
-        # Tạo profession object với tất cả keywords
         merged_profession = {
             "name": profession_name,
             "english_keywords": english_prof["keywords"],
@@ -426,7 +423,6 @@ def _create_merged_professions():
     
     return merged_professions
 
-# Tạo mảng merged một lần duy nhất khi module được import
 MERGED_PROFESSIONS = _create_merged_professions()
 
 def normalize_title(title):
@@ -479,9 +475,8 @@ def normalize_title_enhanced(title, language="both", threshold=0.8):
                 
             keyword_normalized = keyword.lower().strip()
             
-            # Method 1: Exact substring match (highest priority)
             if keyword_normalized in normalized:
-                exact_score = len(keyword_normalized) / len(normalized) * 2  # Boost exact matches
+                exact_score = len(keyword_normalized) / len(normalized) * 2 
                 if exact_score > best_score:
                     best_match = profession["name"]
                     best_score = exact_score
@@ -504,7 +499,6 @@ def normalize_title_enhanced(title, language="both", threshold=0.8):
                 # Exact token match
                 if token in normalized_tokens:
                     match_count += 1
-                # Partial token match (cho phép match một phần của từ dài)
                 elif len(token) >= 4:
                     for norm_token in normalized_tokens:
                         if token in norm_token or norm_token in token:
@@ -513,7 +507,6 @@ def normalize_title_enhanced(title, language="both", threshold=0.8):
             
             score = match_count / len(keyword_tokens)
             
-            # Boost score cho keywords có nhiều tokens match
             if len(keyword_tokens) > 1 and match_count >= 2:
                 score *= 1.2
                 
@@ -524,7 +517,7 @@ def normalize_title_enhanced(title, language="both", threshold=0.8):
     
     return {
         "profession": best_match if best_match else "Unknown",
-        "score": min(best_score, 1.0),  # Cap score at 1.0
+        "score": min(best_score, 1.0), 
         "matched_keyword": best_keyword,
         "original_title": title
     }
